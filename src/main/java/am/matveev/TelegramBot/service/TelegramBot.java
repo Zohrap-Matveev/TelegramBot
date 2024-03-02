@@ -1,6 +1,7 @@
 package am.matveev.TelegramBot.service;
 
 import am.matveev.TelegramBot.config.BotConfig;
+import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,16 +28,17 @@ public class TelegramBot extends TelegramLongPollingBot{
             "Type /mydata to see data stored about yourself\n\n" +
             "Type /help to see this message again";
 
+
     public TelegramBot(BotConfig botConfig){
         this.botConfig = botConfig;
-        List<BotCommand> listofCommands = new ArrayList<>();
-        listofCommands.add(new BotCommand("/start", "get a welcome message"));
-        listofCommands.add(new BotCommand("/mydata", "get your data stored"));
-        listofCommands.add(new BotCommand("/deletedata", "delete my data"));
-        listofCommands.add(new BotCommand("/help", "info how to use this bot"));
-        listofCommands.add(new BotCommand("/settings", "set your preferences"));
+        List<BotCommand> listOfCommands = new ArrayList<>();
+        listOfCommands.add(new BotCommand("/start", "get a welcome message"));
+        listOfCommands.add(new BotCommand("/mydata", "get your data stored"));
+        listOfCommands.add(new BotCommand("/deletedata", "delete my data"));
+        listOfCommands.add(new BotCommand("/help", "info how to use this bot"));
+        listOfCommands.add(new BotCommand("/settings", "set your preferences"));
         try{
-            this.execute(new SetMyCommands(listofCommands, new BotCommandScopeDefault(), null));
+            this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
         }catch(TelegramApiException e){
             log.error("Error setting bot`s command list: " + e.getMessage());
         }
