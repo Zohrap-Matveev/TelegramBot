@@ -89,7 +89,7 @@ public class TelegramBot extends TelegramLongPollingBot{
 
     private void registerUser(Message message){
 
-        if(userRepository.findById(message.getChatId()).isEmpty()) {
+        if(userRepository.findById(message.getChatId()).isEmpty()){
             var chatId = message.getChatId();
             var chat = message.getChat();
 
@@ -105,7 +105,7 @@ public class TelegramBot extends TelegramLongPollingBot{
         }
     }
 
-    private void startCommandReceived(long chatId, String name) throws TelegramApiException{
+    private void startCommandReceived(long chatId, String name){
 
         String answer = EmojiParser.parseToUnicode("Hi , " + name + " , nice to meet you!" + " \uD83D\uDE0A");//:blush:
         log.info("Replied to user " + name);
@@ -113,7 +113,7 @@ public class TelegramBot extends TelegramLongPollingBot{
         sendMessage(chatId, answer);
     }
 
-    private void sendMessage(long chatId, String textToSend) throws TelegramApiException{
+    private void sendMessage(long chatId, String textToSend){
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(textToSend);
