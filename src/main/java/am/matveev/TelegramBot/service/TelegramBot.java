@@ -1,18 +1,24 @@
 package am.matveev.TelegramBot.service;
 
 import am.matveev.TelegramBot.config.BotConfig;
-import lombok.AllArgsConstructor;
+import am.matveev.TelegramBot.model.User;
+import am.matveev.TelegramBot.repository.UserRepository;
+import com.vdurmont.emoji.EmojiParser;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.glassfish.grizzly.http.util.TimeStamp;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +26,8 @@ import java.util.List;
 @Component
 public class TelegramBot extends TelegramLongPollingBot{
 
+
+    private final UserRepository userRepository;
     final BotConfig botConfig;
 
     static final String HELP_TEXT = "This bot is created to demonstrate Spring capabilities.\n\n" +
@@ -29,8 +37,11 @@ public class TelegramBot extends TelegramLongPollingBot{
             "Type /help to see this message again";
 
 
-    public TelegramBot(BotConfig botConfig){
+    @Autowired
+    public TelegramBot(UserRepository userRepository, BotConfig botConfig){
+        this.userRepository = userRepository;
         this.botConfig = botConfig;
+
         List<BotCommand> listOfCommands = new ArrayList<>();
         listOfCommands.add(new BotCommand("/start", "get a welcome message"));
         listOfCommands.add(new BotCommand("/mydata", "get your data stored"));
@@ -63,6 +74,7 @@ public class TelegramBot extends TelegramLongPollingBot{
 
             switch(messageText){
                 case "/start":
+                    registerUser(update.getMessage());
                     startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
                     break;
                 case "/help":
@@ -74,8 +86,27 @@ public class TelegramBot extends TelegramLongPollingBot{
         }
     }
 
+    private void registerUser(Message message){
+
+        if(userRepository.findById(message.getChatId()).isEmpty()) {
+            var chatId = message.getChatId();
+            var chat = message.getChat();
+
+            User user = new User();
+            user.setChatId(chatId);
+            user.setFirstName(chat.getFirstName());
+            user.setLastName(chat.getLastName());
+            user.setUsername(chat.getUserName());
+            user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
+
+            userRepository.save(user);
+            log.info("user saved " + user);
+        }
+    }
+
     private void startCommandReceived(long chatId, String name) throws TelegramApiException{
-        String answer = "Hi , " + name + " , nice to meet you!";
+
+        String answer = EmojiParser.parseToUnicode("Hi , " + name + " , nice to meet you!" + " \uD83D\uDE0A");//:blush:
         log.info("Replied to user " + name);
 
         sendMessage(chatId, answer);
