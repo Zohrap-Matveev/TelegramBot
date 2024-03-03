@@ -6,7 +6,6 @@ import am.matveev.TelegramBot.repository.UserRepository;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.glassfish.grizzly.http.util.TimeStamp;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -147,8 +146,6 @@ public class TelegramBot extends TelegramLongPollingBot{
         row.add("register");
         row.add("check my data");
         row.add("delete my data");
-
-        row = new KeyboardRow();
 
         keyboardRows.add(row);
 
