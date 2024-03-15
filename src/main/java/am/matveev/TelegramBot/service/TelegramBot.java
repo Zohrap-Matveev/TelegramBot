@@ -1,5 +1,6 @@
 package am.matveev.TelegramBot.service;
 
+import am.matveev.TelegramBot.button.SmileyButtonCreator;
 import am.matveev.TelegramBot.config.BotConfig;
 import am.matveev.TelegramBot.model.Ads;
 import am.matveev.TelegramBot.model.User;
@@ -34,6 +35,7 @@ public class TelegramBot extends TelegramLongPollingBot{
     private UserRepository userRepository;
     private AdsRepository adsRepository;
     final BotConfig config;
+    private SmileyButtonCreator smileyButtonCreator;
 
     static final String HELP_TEXT = "This bot is created to demonstrate Spring capabilities.\n\n" +
             "You can execute commands from the main menu on the left or by typing a command:\n\n" +
@@ -46,51 +48,67 @@ public class TelegramBot extends TelegramLongPollingBot{
     static final String NO_BUTTON = "NO_BUTTON";
     static final String ERROR_TEXT = "Error occurred: ";
 
-    public TelegramBot(UserRepository userRepository, AdsRepository adsRepository, BotConfig config) {
+    public TelegramBot(UserRepository userRepository, AdsRepository adsRepository, BotConfig config){
         this.userRepository = userRepository;
         this.adsRepository = adsRepository;
         this.config = config;
+        this.smileyButtonCreator = smileyButtonCreator;
         List<BotCommand> listofCommands = new ArrayList<>();
         listofCommands.add(new BotCommand("/start", "get a welcome message"));
         listofCommands.add(new BotCommand("/mydata", "get your data stored"));
         listofCommands.add(new BotCommand("/deletedata", "delete my data"));
         listofCommands.add(new BotCommand("/help", "info how to use this bot"));
         listofCommands.add(new BotCommand("/settings", "set your preferences"));
-        try {
+        listofCommands.add(new BotCommand("/smile", "choose a smiley"));
+
+        try{
             this.execute(new SetMyCommands(listofCommands, new BotCommandScopeDefault(), null));
-        } catch (TelegramApiException e) {
+        }catch(TelegramApiException e){
             log.error("Error setting bot's command list: " + e.getMessage());
         }
     }
 
     @Override
-    public String getBotUsername() {
+    public String getBotUsername(){
         return config.getName();
     }
 
     @Override
-    public String getBotToken() {
+    public String getBotToken(){
         return config.getToken();
     }
 
-    @Override
-    public void onUpdateReceived(Update update) {
+    private void sendSmileMenu(long chatId){
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Choose a smiley:");
 
-        if (update.hasMessage() && update.getMessage().hasText()) {
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = SmileyButtonCreator.createSmileyButtons();
+
+        markupInline.setKeyboard(rowsInline);
+        message.setReplyMarkup(markupInline);
+
+        executeMessage(message);
+    }
+
+
+    @Override
+    public void onUpdateReceived(Update update){
+
+        if(update.hasMessage() && update.getMessage().hasText()){
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
 
-            if(messageText.contains("/send") && config.getOwnerId() == chatId) {
+            if(messageText.contains("/send") && config.getOwnerId() == chatId){
                 var textToSend = EmojiParser.parseToUnicode(messageText.substring(messageText.indexOf(" ")));
                 var users = userRepository.findAll();
-                for (User user: users){
+                for(User user : users){
                     prepareAndSendMessage(user.getChatId(), textToSend);
                 }
-            }
+            }else{
 
-            else {
-
-                switch (messageText) {
+                switch(messageText){
                     case "/start":
 
                         registerUser(update.getMessage());
@@ -106,14 +124,16 @@ public class TelegramBot extends TelegramLongPollingBot{
 
                         register(chatId);
                         break;
+                    case "/smile":
+                        sendSmileMenu(chatId);
+                        break;
 
                     default:
-
                         prepareAndSendMessage(chatId, "Sorry, command was not recognized");
 
                 }
             }
-        } else if (update.hasCallbackQuery()) {
+        }else if(update.hasCallbackQuery()){
             String callbackData = update.getCallbackQuery().getData();
             long messageId = update.getCallbackQuery().getMessage().getMessageId();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
@@ -121,17 +141,18 @@ public class TelegramBot extends TelegramLongPollingBot{
             if(callbackData.equals(YES_BUTTON)){
                 String text = "You pressed YES button";
                 executeEditMessageText(text, chatId, messageId);
-            }
-            else if(callbackData.equals(NO_BUTTON)){
+            }else if(callbackData.equals(NO_BUTTON)){
                 String text = "You pressed NO button";
                 executeEditMessageText(text, chatId, messageId);
+            }else if(callbackData.startsWith("smiley:")){
+                String selectedSmiley = callbackData.substring("smiley:".length());
+                // Отправить выбранный смайлик в чат
+                prepareAndSendMessage(chatId, selectedSmiley);
             }
         }
-
-
     }
 
-    private void register(long chatId) {
+    private void register(long chatId){
 
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -161,7 +182,7 @@ public class TelegramBot extends TelegramLongPollingBot{
         executeMessage(message);
     }
 
-    private void registerUser(Message msg) {
+    private void registerUser(Message msg){
 
         if(userRepository.findById(msg.getChatId()).isEmpty()){
 
@@ -181,7 +202,7 @@ public class TelegramBot extends TelegramLongPollingBot{
         }
     }
 
-    private void startCommandReceived(long chatId, String name) {
+    private void startCommandReceived(long chatId, String name){
 
 
         String answer = EmojiParser.parseToUnicode("Hi, " + name + ", nice to meet you!" + " :blush:");
@@ -191,7 +212,7 @@ public class TelegramBot extends TelegramLongPollingBot{
         sendMessage(chatId, answer);
     }
 
-    private void sendMessage(long chatId, String textToSend) {
+    private void sendMessage(long chatId, String textToSend){
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
@@ -227,19 +248,19 @@ public class TelegramBot extends TelegramLongPollingBot{
         EditMessageText message = new EditMessageText();
         message.setChatId(String.valueOf(chatId));
         message.setText(text);
-        message.setMessageId((int) messageId);
+        message.setMessageId((int)messageId);
 
-        try {
+        try{
             execute(message);
-        } catch (TelegramApiException e) {
+        }catch(TelegramApiException e){
             log.error(ERROR_TEXT + e.getMessage());
         }
     }
 
     private void executeMessage(SendMessage message){
-        try {
+        try{
             execute(message);
-        } catch (TelegramApiException e) {
+        }catch(TelegramApiException e){
             log.error(ERROR_TEXT + e.getMessage());
         }
     }
@@ -257,8 +278,8 @@ public class TelegramBot extends TelegramLongPollingBot{
         var ads = adsRepository.findAll();
         var users = userRepository.findAll();
 
-        for(Ads ad: ads) {
-            for (User user: users){
+        for(Ads ad : ads){
+            for(User user : users){
                 prepareAndSendMessage(user.getChatId(), ad.getAd());
             }
         }
