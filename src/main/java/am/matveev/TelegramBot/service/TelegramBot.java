@@ -14,6 +14,7 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
@@ -35,7 +36,7 @@ public class TelegramBot extends TelegramLongPollingBot{
     private UserRepository userRepository;
     private AdsRepository adsRepository;
     final BotConfig config;
-    private SmileyButtonCreator smileyButtonCreator;
+    private final WeatherService weatherService;
 
     static final String HELP_TEXT = "This bot is created to demonstrate Spring capabilities.\n\n" +
             "You can execute commands from the main menu on the left or by typing a command:\n\n" +
@@ -52,7 +53,7 @@ public class TelegramBot extends TelegramLongPollingBot{
         this.userRepository = userRepository;
         this.adsRepository = adsRepository;
         this.config = config;
-        this.smileyButtonCreator = smileyButtonCreator;
+        this.weatherService = new WeatherService(config);
         List<BotCommand> listofCommands = new ArrayList<>();
         listofCommands.add(new BotCommand("/start", "get a welcome message"));
         listofCommands.add(new BotCommand("/mydata", "get your data stored"));
@@ -91,64 +92,65 @@ public class TelegramBot extends TelegramLongPollingBot{
 
         executeMessage(message);
     }
-
-
     @Override
-    public void onUpdateReceived(Update update){
+    public void onUpdateReceived(Update update) {
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            handleMessageUpdate(update.getMessage());
+        } else {
+            handleCallbackQuery(update.getCallbackQuery());
+        }
+    }
 
-        if(update.hasMessage() && update.getMessage().hasText()){
-            String messageText = update.getMessage().getText();
-            long chatId = update.getMessage().getChatId();
+    private void handleMessageUpdate(Message message) {
+        String messageText = message.getText();
+        long chatId = message.getChatId();
 
-            if(messageText.contains("/send") && config.getOwnerId() == chatId){
-                var textToSend = EmojiParser.parseToUnicode(messageText.substring(messageText.indexOf(" ")));
-                var users = userRepository.findAll();
-                for(User user : users){
-                    prepareAndSendMessage(user.getChatId(), textToSend);
-                }
-            }else{
-
-                switch(messageText){
-                    case "/start":
-
-                        registerUser(update.getMessage());
-                        startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
-                        break;
-
-                    case "/help":
-
-                        prepareAndSendMessage(chatId, HELP_TEXT);
-                        break;
-
-                    case "/register":
-
-                        register(chatId);
-                        break;
-                    case "/smile":
-                        sendSmileMenu(chatId);
-                        break;
-
-                    default:
-                        prepareAndSendMessage(chatId, "Sorry, command was not recognized");
-
-                }
+        if (messageText.contains("/send") && config.getOwnerId() == chatId) {
+            var textToSend = EmojiParser.parseToUnicode(messageText.substring(messageText.indexOf(" ")));
+            var users = userRepository.findAll();
+            for (User user : users) {
+                prepareAndSendMessage(user.getChatId(), textToSend);
             }
-        }else if(update.hasCallbackQuery()){
-            String callbackData = update.getCallbackQuery().getData();
-            long messageId = update.getCallbackQuery().getMessage().getMessageId();
-            long chatId = update.getCallbackQuery().getMessage().getChatId();
-
-            if(callbackData.equals(YES_BUTTON)){
-                String text = "You pressed YES button";
-                executeEditMessageText(text, chatId, messageId);
-            }else if(callbackData.equals(NO_BUTTON)){
-                String text = "You pressed NO button";
-                executeEditMessageText(text, chatId, messageId);
-            }else if(callbackData.startsWith("smiley:")){
-                String selectedSmiley = callbackData.substring("smiley:".length());
-                // Отправить выбранный смайлик в чат
-                prepareAndSendMessage(chatId, selectedSmiley);
+        } else {
+            switch (messageText) {
+                case "/start":
+                    startCommandReceived(chatId, message.getChat().getFirstName());
+                    break;
+                case "/help":
+                    prepareAndSendMessage(chatId, HELP_TEXT);
+                    break;
+                case "/register":
+                    registerUser(message);
+                    register(chatId);
+                    break;
+                case "/smile":
+                    sendSmileMenu(chatId);
+                    break;
+                case "/weather in Yerevan":
+                    String weatherInfo = weatherService.getWeatherInYerevan();
+                    prepareAndSendMessage(chatId, weatherInfo);
+                    break;
+                default:
+                    log.info("Unrecognized command: [{}]", messageText);
+                    prepareAndSendMessage(chatId, "Sorry, command was not recognized");
             }
+        }
+    }
+
+    private void handleCallbackQuery(CallbackQuery callbackQuery) {
+        String callbackData = callbackQuery.getData();
+        long messageId = callbackQuery.getMessage().getMessageId();
+        long chatId = callbackQuery.getMessage().getChatId();
+
+        if (callbackData.equals(YES_BUTTON)) {
+            String text = "You pressed YES button";
+            executeEditMessageText(text, chatId, messageId);
+        } else if (callbackData.equals(NO_BUTTON)) {
+            String text = "You pressed NO button";
+            executeEditMessageText(text, chatId, messageId);
+        } else if (callbackData.startsWith("smiley:")) {
+            String selectedSmiley = callbackData.substring("smiley:".length());
+            prepareAndSendMessage(chatId, selectedSmiley);
         }
     }
 
@@ -204,10 +206,8 @@ public class TelegramBot extends TelegramLongPollingBot{
 
     private void startCommandReceived(long chatId, String name){
 
-
         String answer = EmojiParser.parseToUnicode("Hi, " + name + ", nice to meet you!" + " :blush:");
         log.info("Replied to user " + name);
-
 
         sendMessage(chatId, answer);
     }
@@ -223,14 +223,14 @@ public class TelegramBot extends TelegramLongPollingBot{
 
         KeyboardRow row = new KeyboardRow();
 
-        row.add("weather");
-        row.add("get random joke");
+        row.add("/weather in Yerevan");
+        row.add("/get random joke");
 
         keyboardRows.add(row);
 
         row = new KeyboardRow();
 
-        row.add("register");
+        row.add("/register");
         row.add("check my data");
         row.add("delete my data");
 
