@@ -8,6 +8,8 @@ import am.matveev.TelegramBot.repository.AdsRepository;
 import am.matveev.TelegramBot.repository.UserRepository;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -25,6 +27,11 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -130,6 +137,9 @@ public class TelegramBot extends TelegramLongPollingBot{
                     String weatherInfo = weatherService.getWeatherInYerevan();
                     prepareAndSendMessage(chatId, weatherInfo);
                     break;
+                case "/Bitcoin info":
+                    getBitcoinInfoButtonPressed(chatId);
+                    break;
                 default:
                     log.info("Unrecognized command: [{}]", messageText);
                     prepareAndSendMessage(chatId, "Sorry, command was not recognized");
@@ -224,15 +234,7 @@ public class TelegramBot extends TelegramLongPollingBot{
         KeyboardRow row = new KeyboardRow();
 
         row.add("/weather in Yerevan");
-        row.add("/get random joke");
-
-        keyboardRows.add(row);
-
-        row = new KeyboardRow();
-
-        row.add("/register");
-        row.add("check my data");
-        row.add("delete my data");
+        row.add("/Bitcoin info");
 
         keyboardRows.add(row);
 
@@ -242,7 +244,6 @@ public class TelegramBot extends TelegramLongPollingBot{
 
         executeMessage(message);
     }
-
 
     private void executeEditMessageText(String text, long chatId, long messageId){
         EditMessageText message = new EditMessageText();
@@ -284,4 +285,51 @@ public class TelegramBot extends TelegramLongPollingBot{
             }
         }
     }
+    private String getBitcoinInfo() {
+        try {
+            String apiUrl = "https://api.coinranking.com/v2/coin/Qwsogvtv82FCd?referenceCurrencyUuid=yhjMzLPhuIDl&timePeriod=24h";
+            URL url = new URL(apiUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String inputLine;
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
+                }
+                in.close();
+
+                String jsonResponse = response.toString();
+                JSONObject jsonObject = new JSONObject(jsonResponse);
+
+                if (jsonObject.has("data") && jsonObject.getJSONObject("data").has("coin")) {
+                    JSONObject data = jsonObject.getJSONObject("data");
+                    JSONObject coin = data.getJSONObject("coin");
+
+                    double price = Double.parseDouble(coin.getString("price"));
+                    double change = Double.parseDouble(coin.getString("change"));
+                    double volume24h = Double.parseDouble(coin.getString("24hVolume"));
+                    double marketCap = Double.parseDouble(coin.getString("marketCap"));
+
+                    return String.format("Price: $%.2f\nChange (24h): %.2f%%\n24h Volume: $%.2f\nMarket Cap: $%.2f", price, change, volume24h, marketCap);
+                } else {
+                    return "Error: Unexpected response structure from coinranking.com";
+                }
+            } else {
+                return "Error fetching Bitcoin information. Response code: " + responseCode;
+            }
+        } catch (IOException | JSONException e) {
+            e.printStackTrace();
+            return "Error fetching Bitcoin information";
+        }
+    }
+
+    private void getBitcoinInfoButtonPressed(long chatId) {
+        String bitcoinInfo = getBitcoinInfo();
+        prepareAndSendMessage(chatId, bitcoinInfo);
+    }
+
 }
