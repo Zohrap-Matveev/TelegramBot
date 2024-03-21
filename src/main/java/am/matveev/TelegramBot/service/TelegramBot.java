@@ -48,9 +48,8 @@ public class TelegramBot extends TelegramLongPollingBot{
     static final String HELP_TEXT = "This bot is created to demonstrate Spring capabilities.\n\n" +
             "You can execute commands from the main menu on the left or by typing a command:\n\n" +
             "Type /start to see a welcome message\n\n" +
-            "Type /mydata to see data stored about yourself\n\n" +
             "Type /help to see this message again\n\n" +
-            "Type /register if you want to register";
+            "Type /Register if you want to register";
 
     static final String YES_BUTTON = "YES_BUTTON";
     static final String NO_BUTTON = "NO_BUTTON";
@@ -63,8 +62,6 @@ public class TelegramBot extends TelegramLongPollingBot{
         this.weatherService = new WeatherService(config);
         List<BotCommand> listofCommands = new ArrayList<>();
         listofCommands.add(new BotCommand("/start", "get a welcome message"));
-        listofCommands.add(new BotCommand("/mydata", "get your data stored"));
-        listofCommands.add(new BotCommand("/deletedata", "delete my data"));
         listofCommands.add(new BotCommand("/help", "info how to use this bot"));
         listofCommands.add(new BotCommand("/settings", "set your preferences"));
         listofCommands.add(new BotCommand("/smile", "choose a smiley"));
@@ -126,14 +123,14 @@ public class TelegramBot extends TelegramLongPollingBot{
                 case "/help":
                     prepareAndSendMessage(chatId, HELP_TEXT);
                     break;
-                case "/register":
+                case "/Register":
                     registerUser(message);
                     register(chatId);
                     break;
                 case "/smile":
                     sendSmileMenu(chatId);
                     break;
-                case "/weather in Yerevan":
+                case "/Weather in Yerevan":
                     String weatherInfo = weatherService.getWeatherInYerevan();
                     prepareAndSendMessage(chatId, weatherInfo);
                     break;
@@ -233,8 +230,9 @@ public class TelegramBot extends TelegramLongPollingBot{
 
         KeyboardRow row = new KeyboardRow();
 
-        row.add("/weather in Yerevan");
+        row.add("/Weather in Yerevan");
         row.add("/Bitcoin info");
+        row.add("/Register");
 
         keyboardRows.add(row);
 
